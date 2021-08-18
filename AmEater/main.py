@@ -52,6 +52,9 @@ class AmEater:
 	def __init__(self, writer_id):
 		self.writer_id = writer_id
 
+	def echo(self):
+		print(self.writer_id)
+
 	def get_download_target_urls(writer_id) -> list:
 		""" ライター固有のID（writer_id）から、ダウンロード対象のページURLを取得し、リストで返します """
 		download_targets = []
@@ -77,8 +80,6 @@ class AmEater:
 
 		return download_targets
 
-
-
 def main():
 	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -86,10 +87,12 @@ def main():
 
 	writers = read_settings()
 
-	# シリーズの全記事urlの取得と投稿日でソート
 	for writer_id in writers:
-		download_targets = get_download_target_urls(writer_id)
-		download_targets.sort(key=lambda x: x["article_date"])
+		Writer = AmEater(writer_id)
+		Writer.echo()
+		# シリーズの全記事urlの取得と投稿日でソート
+		# download_targets = get_download_target_urls(writer_id)
+		# download_targets.sort(key=lambda x: x["article_date"])
 
 if __name__ == "__main__":
 	main()
