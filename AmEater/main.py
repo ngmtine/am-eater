@@ -26,11 +26,23 @@ class AmEater:
 	
 	def __init__(self, writer_id):
 		self.writer_id = writer_id
+		self.writer_name = self.get_writername()
 		self.article_urls = self.get_article_urls()
 
-	def get_article_urls(self):
-		""" ライター固有のID（writer_id）から、ダウンロード対象のページURLを取得し、リストで返します """
+	def get_writername(self):
+		"""
+		ライター名を取得する
+		"""
+		url = f"https://am-our.com/author/{self.writer_id}/"
+		response = requests.get(url)
+		soup = BeautifulSoup(response.text,'lxml')
+		writername = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
+		return writername
 
+	def get_article_urls(self):
+		"""
+		writer_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す
+		"""
 		article_infos = []
 		page_num = 0
 		while True:
@@ -56,8 +68,40 @@ class AmEater:
 		article_infos.sort(key=lambda x: x["article_date"])
 		return article_infos
 
-	def downlaod(self):
-		print("★ ダウンロードするよ～")	
+	def download_images(self, url, series_num):
+		"""
+		個別ページのurlから画像をダウンロードする
+		Parameters
+		---
+		url: str
+			ダウンロードしたい画像へのリンクを含む、個別記事のurl
+		series_num: int
+			連載の中の第何話目かを示す変数
+		"""
+
+		# response = requests.get(url)
+		# soup = BeautifulSoup(response.text,'lxml')
+
+		print("★ 書きかけです")
+		return
+		author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
+		series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
+		article_title = soup.select(".article-title")[0].getText().strip() # 記事名
+		article_id = article_url.rsplit("/")[-1] # 記事ID
+
+		print(f"★ {article_id=} {article_title} をダウンロードします")
+
+		for idx, elm in enumerate(soup.select(".article-content p img")):
+			url = elm.get("src")
+			try:
+				filename = f"{str(series_num)}_{article_title}({article_id})_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
+				# dest = os.path.join(dirname, filename)
+				response = requests.get(url)
+				image = response.content
+				with open(filename, mode="wb") as file:
+					file.write(image)
+			except Exception as e:
+				print(e)
 
 def main():
 	print("★ starting am-eater...")
@@ -65,10 +109,11 @@ def main():
 	os.chdir(root_dir)
 
 	writers = read_settings()
-
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
-		Writer.download()
+		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
+			url = url_dict["article_url"]
+			Writer.download_images(url, series_num)
 
 		print("オワリ")
 
