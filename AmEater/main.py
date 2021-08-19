@@ -29,6 +29,20 @@ class AmEater:
 		self.writer_name = self.get_writername()
 		self.article_urls = self.get_article_urls()
 
+	def mkdir_chdir(self, root_dir):
+		"""
+		ダウンロード先フォルダの作成と移動
+		downloaded.txtの作成
+		"""
+		dest_dir = os.path.join(root_dir, self.writer_name)
+		os.makedirs(dest_dir, exist_ok=True)
+		os.chdir(dest_dir)
+
+		downloaded_txt = os.path.join(dest_dir, "downloaded.txt")
+		if not os.path.isfile(downloaded_txt):
+			with open(downloaded_txt, mode="w") as f:
+				f.write("")
+
 	def get_writername(self):
 		"""
 		ライター名を取得する
@@ -85,7 +99,6 @@ class AmEater:
 		article_title = soup.select(".heading.heading-primary")[0].getText()
 		print(f"★ {series_num} {article_title} をダウンロードします")
 
-
 		# for idx, elm in enumerate(soup.select(".article-content p img")):
 		# 	url = elm.get("src")
 		# 	try:
@@ -100,6 +113,9 @@ class AmEater:
 
 		return
 
+	def check_downloaded(self):
+		pass
+	
 def main():
 	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -108,6 +124,7 @@ def main():
 	writers = read_settings()
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
+		Writer.mkdir_chdir(root_dir)
 		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
 			Writer.download_images(url, series_num)
