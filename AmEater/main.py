@@ -21,46 +21,21 @@ def read_settings():
 	
 	return writers
 
-def get_download_target_urls(writer_id) -> list:
-	""" ライター固有のID（author_id）から、ダウンロード対象のページURLを取得し、リストで返します """
-	download_targets = []
-
-	for page_num in range(1, 999):
-		request_url = f"https://am-our.com/author/{writer_id}/page/{page_num}/"
-		response = requests.get(request_url)
-		soup = BeautifulSoup(response.text,'lxml')
-		pages = soup.select(".archive_author_top.view-mask, .article_top_center.archive__item.view-mask")
-
-		if pages == []: # ページ遷移先がなくなった時
-			break
-
-		while pages:
-			try:
-				article = pages.pop()
-				# article_url = article.get("href")
-				article_url = article.select(".eyecatch__link.eyecatch__link-mask-latest")[0].attrs["href"]
-				article_date = article.select(".dateList__item")[0].contents[0].strip()
-				download_targets.append({"article_url": article_url, "article_date": article_date})
-			except Exception as e:
-				print(e)
-
-	return download_targets
-
 class AmEater:
 	"""ライター固有のID（writer_id）を受け取り、記事内の画像をDLします"""
 	
 	def __init__(self, writer_id):
 		self.writer_id = writer_id
+		self.article_urls = self.get_article_urls()
 
-	def echo(self):
-		print(self.writer_id)
-
-	def get_download_target_urls(writer_id) -> list:
+	def get_article_urls(self):
 		""" ライター固有のID（writer_id）から、ダウンロード対象のページURLを取得し、リストで返します """
-		download_targets = []
 
-		for page_num in range(1, 999):
-			request_url = f"https://am-our.com/author/{writer_id}/page/{page_num}/"
+		article_infos = []
+		page_num = 0
+		while True:
+			page_num += 1
+			request_url = f"https://am-our.com/author/{self.writer_id}/page/{page_num}/"
 			response = requests.get(request_url)
 			soup = BeautifulSoup(response.text,'lxml')
 			pages = soup.select(".archive_author_top.view-mask, .article_top_center.archive__item.view-mask")
@@ -71,14 +46,18 @@ class AmEater:
 			while pages:
 				try:
 					article = pages.pop()
-					# article_url = article.get("href")
 					article_url = article.select(".eyecatch__link.eyecatch__link-mask-latest")[0].attrs["href"]
 					article_date = article.select(".dateList__item")[0].contents[0].strip()
-					download_targets.append({"article_url": article_url, "article_date": article_date})
+					article_infos.append({"article_url": article_url, "article_date": article_date})
 				except Exception as e:
 					print(e)
 
-		return download_targets
+		# 投稿日付昇順でソート
+		article_infos.sort(key=lambda x: x["article_date"])
+		return article_infos
+
+	def downlaod(self):
+		print("★ ダウンロードするよ～")	
 
 def main():
 	print("★ starting am-eater...")
@@ -89,10 +68,9 @@ def main():
 
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
-		Writer.echo()
-		# シリーズの全記事urlの取得と投稿日でソート
-		# download_targets = get_download_target_urls(writer_id)
-		# download_targets.sort(key=lambda x: x["article_date"])
+		Writer.download()
+
+		print("オワリ")
 
 if __name__ == "__main__":
 	main()
