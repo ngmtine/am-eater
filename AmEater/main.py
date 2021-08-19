@@ -85,6 +85,8 @@ class AmEater:
 	def download_images(self, url, series_num):
 		"""
 		個別ページのurlから画像をダウンロードする
+		但し記事によってはhtmlが異なることに注意
+
 		Parameters
 		---
 		url: str
@@ -99,17 +101,43 @@ class AmEater:
 		article_title = soup.select(".heading.heading-primary")[0].getText()
 		print(f"★ {series_num} {article_title} をダウンロードします")
 
-		# for idx, elm in enumerate(soup.select(".article-content p img")):
-		# 	url = elm.get("src")
-		# 	try:
-		# 		filename = f"{str(series_num)}_{article_title}({article_id})_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
-		# 		# dest = os.path.join(dirname, filename)
-		# 		response = requests.get(url)
-		# 		image = response.content
-		# 		with open(filename, mode="wb") as file:
-		# 			file.write(image)
-		# 	except Exception as e:
-		# 		print(e)
+		# パターン１
+		# 例：https://am-our.com/love/110/17022/
+		if soup.select(".photo img"):
+			for idx in range(len(soup.select(".photo img"))):
+				img_url = soup.select(".photo img")[idx].get("src")
+				filename = f"{article_title}_{idx+1}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+				image = requests.get(img_url).content
+				try:
+					with open(filename, mode="wb") as file:
+						file.write(image)
+				except Exception as e:
+					print(e)
+
+		# パターン２
+		# 1ページに1画像のみを想定
+		# 例：https://am-our.com/love/103245/
+		elif soup.select(".aligncenter.is-resized"):
+			idx = 0
+			while True:
+				idx += 1
+				url_idx = f"{url}{idx}/"
+				response = requests.get(url_idx)
+				if response.status_code == 404:
+					break
+				soup = BeautifulSoup(response.text,'lxml')
+				img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
+				filename = f"{article_title}_{idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+				image = requests.get(img_url).content
+				try:
+					with open(filename, mode="wb") as file:
+						file.write(image)
+				except Exception as e:
+					print(e)
+			
+		else:
+			print("★ 未定義urlです")
+			print(f"★ {series_num} {article_title} をダウンロードできませんでした")
 
 		return
 
@@ -127,7 +155,9 @@ def main():
 		Writer.mkdir_chdir(root_dir)
 		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
-			Writer.download_images(url, series_num)
+			# Writer.download_images(url, series_num)
+
+			Writer.download_images("https://am-our.com/love/103245/", series_num)
 
 		print("オワリ")
 
