@@ -79,29 +79,26 @@ class AmEater:
 			連載の中の第何話目かを示す変数
 		"""
 
-		# response = requests.get(url)
-		# soup = BeautifulSoup(response.text,'lxml')
+		response = requests.get(url)
+		soup = BeautifulSoup(response.text,'lxml')
 
-		print("★ 書きかけです")
+		article_title = soup.select(".heading.heading-primary")[0].getText()
+		print(f"★ {series_num} {article_title} をダウンロードします")
+
+
+		# for idx, elm in enumerate(soup.select(".article-content p img")):
+		# 	url = elm.get("src")
+		# 	try:
+		# 		filename = f"{str(series_num)}_{article_title}({article_id})_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
+		# 		# dest = os.path.join(dirname, filename)
+		# 		response = requests.get(url)
+		# 		image = response.content
+		# 		with open(filename, mode="wb") as file:
+		# 			file.write(image)
+		# 	except Exception as e:
+		# 		print(e)
+
 		return
-		author = soup.find("meta", attrs={"name": "author"})["content"] # 著者
-		series_title = soup.select("#area_main .box-series .post-items .post-title a")[0].getText().rstrip() # シリーズ名
-		article_title = soup.select(".article-title")[0].getText().strip() # 記事名
-		article_id = article_url.rsplit("/")[-1] # 記事ID
-
-		print(f"★ {article_id=} {article_title} をダウンロードします")
-
-		for idx, elm in enumerate(soup.select(".article-content p img")):
-			url = elm.get("src")
-			try:
-				filename = f"{str(series_num)}_{article_title}({article_id})_{str(idx+1)}.png" # 現在はpng以外の拡張子を想定してない
-				# dest = os.path.join(dirname, filename)
-				response = requests.get(url)
-				image = response.content
-				with open(filename, mode="wb") as file:
-					file.write(image)
-			except Exception as e:
-				print(e)
 
 def main():
 	print("★ starting am-eater...")
