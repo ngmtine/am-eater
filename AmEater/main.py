@@ -27,21 +27,9 @@ class AmEater:
 	def __init__(self, writer_id):
 		self.writer_id = writer_id
 		self.writer_name = self.get_writername()
+		self.mkdir_chdir()
+		self.downloaded_list = self.get_downloaded_list()
 		self.article_urls = self.get_article_urls()
-
-	def mkdir_chdir(self, root_dir):
-		"""
-		ダウンロード先フォルダの作成と移動
-		downloaded.txtの作成
-		"""
-		dest_dir = os.path.join(root_dir, self.writer_name)
-		os.makedirs(dest_dir, exist_ok=True)
-		os.chdir(dest_dir)
-
-		downloaded_txt = os.path.join(dest_dir, "downloaded.txt")
-		if not os.path.isfile(downloaded_txt):
-			with open(downloaded_txt, mode="w") as f:
-				f.write("")
 
 	def get_writername(self):
 		"""
@@ -53,6 +41,32 @@ class AmEater:
 		writername = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
 		return writername
 
+	def mkdir_chdir(self):
+		"""
+		カレントディレクトリ（ダウンロードルートフォルダ）にダウンロード先フォルダの作成と移動
+		"""
+		dest_dir = os.path.join(os.getcwd(), self.writer_name)
+		os.makedirs(dest_dir, exist_ok=True)
+		os.chdir(dest_dir)
+
+	def get_downloaded_list(self):
+		"""
+		カレントディレクトリのdownloaded.txtの作成と読み込み
+		（ダウンロード先フォルダにCDしていることが前提）
+		"""
+		downloaded_txt = os.path.join(os.getcwd(), "downloaded.txt")
+
+		# downloaded.txtの作成
+		if not os.path.isfile(downloaded_txt):
+			with open(downloaded_txt, mode="w") as f:
+				f.write("")
+
+		# downloaded.txtの読み込み
+		with open(downloaded_txt, mode="r") as f:
+			downloaded_list = list(map(lambda i: i.rstrip(), f.readlines()))
+
+		return downloaded_list
+
 	def get_article_urls(self):
 		"""
 		writer_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す
@@ -63,11 +77,11 @@ class AmEater:
 			page_num += 1
 			request_url = f"https://am-our.com/author/{self.writer_id}/page/{page_num}/"
 			response = requests.get(request_url)
+			if response.status_code == 404: # ページ遷移先がなくなった時
+				break
+
 			soup = BeautifulSoup(response.text,'lxml')
 			pages = soup.select(".archive_author_top.view-mask, .article_top_center.archive__item.view-mask")
-
-			if pages == []: # ページ遷移先がなくなった時
-				break
 
 			while pages:
 				try:
@@ -82,68 +96,77 @@ class AmEater:
 		article_infos.sort(key=lambda x: x["article_date"])
 		return article_infos
 
-	def download_images(self, url, series_num):
+	def download_images(self, page_url, series_num):
 		"""
 		個別ページのurlから画像をダウンロードする
 		但し記事によってはhtmlが異なることに注意
 
 		Parameters
 		---
-		url: str
+		page_url: str
 			ダウンロードしたい画像へのリンクを含む、個別記事のurl
 		series_num: int
 			連載の中の第何話目かを示す変数
 		"""
 
-		response = requests.get(url)
+		response = requests.get(page_url)
 		soup = BeautifulSoup(response.text,'lxml')
 
-		article_title = soup.select(".heading.heading-primary")[0].getText()
-		print(f"★ {series_num} {article_title} をダウンロードします")
+		if page_url in self.downloaded_list: # ダウンロード済みの場合
+			return
 
-		# パターン１
-		# 例：https://am-our.com/love/110/17022/
-		if soup.select(".photo img"):
-			for idx in range(len(soup.select(".photo img"))):
-				img_url = soup.select(".photo img")[idx].get("src")
-				filename = f"{article_title}_{idx+1}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-				image = requests.get(img_url).content
-				try:
-					with open(filename, mode="wb") as file:
-						file.write(image)
-				except Exception as e:
-					print(e)
+		else: # 未ダウンロードの場合
+			article_title = soup.select(".heading.heading-primary")[0].getText()
+			print(f"★ {series_num} {article_title} をダウンロードします")
 
-		# パターン２
-		# 1ページに1画像のみを想定
-		# 例：https://am-our.com/love/103245/
-		elif soup.select(".aligncenter.is-resized"):
-			idx = 0
-			while True:
-				idx += 1
-				url_idx = f"{url}{idx}/"
-				response = requests.get(url_idx)
-				if response.status_code == 404:
-					break
-				soup = BeautifulSoup(response.text,'lxml')
-				img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
-				filename = f"{article_title}_{idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-				image = requests.get(img_url).content
-				try:
-					with open(filename, mode="wb") as file:
-						file.write(image)
-				except Exception as e:
-					print(e)
-			
-		else:
-			print("★ 未定義urlです")
-			print(f"★ {series_num} {article_title} をダウンロードできませんでした")
+			# パターン１
+			# 例：https://am-our.com/love/110/17022/
+			if soup.select(".photo img"):
+				for idx in range(len(soup.select(".photo img"))):
+					img_url = soup.select(".photo img")[idx].get("src")
+					filename = f"{article_title}_{idx+1}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+					image = requests.get(img_url).content
+					try:
+						with open(filename, mode="wb") as file:
+							file.write(image)
+					except Exception as e:
+						print(e)
+						return
+				self.append_downloaded_txt(page_url) # ダウンロード成功したらdownloaded.txtにurlを追記
+
+			# パターン２
+			# 1ページに1画像のみを想定
+			# 例：https://am-our.com/love/103245/
+			elif soup.select(".aligncenter.is-resized"):
+				idx = 0
+				while True:
+					idx += 1
+					url_idx = f"{page_url}{idx}/"
+					response = requests.get(url_idx)
+					if response.status_code == 404:
+						break
+					soup = BeautifulSoup(response.text,'lxml')
+					img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
+					filename = f"{article_title}_{idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+					image = requests.get(img_url).content
+					try:
+						with open(filename, mode="wb") as file:
+							file.write(image)
+					except Exception as e:
+						print(e)
+						return
+				self.append_downloaded_txt(page_url) # ダウンロード成功したらdownloaded.txtにurlを追記
+				
+			else: # ダウンロード用のコードが用意されていないパターンの場合
+				print("★ 未定義urlです")
+				print(f"★ {series_num} {article_title} をダウンロードできませんでした")
 
 		return
 
-	def check_downloaded(self):
-		pass
-	
+	def append_downloaded_txt(self, string):
+		with open("downloaded.txt", mode="a") as f:
+			f.writelines(f"{string}\n")
+
 def main():
 	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -152,12 +175,9 @@ def main():
 	writers = read_settings()
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
-		Writer.mkdir_chdir(root_dir)
 		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
-			# Writer.download_images(url, series_num)
-
-			Writer.download_images("https://am-our.com/love/103245/", series_num)
+			Writer.download_images(url, series_num)
 
 		print("オワリ")
 
