@@ -186,7 +186,7 @@ class AmEater:
 			nextpage_url = soup.select(".next_page_block")[0].get("href")
 			response = requests.get(nextpage_url)
 			soup = BeautifulSoup(response.text,'lxml')
-			self.download_images_class_photo(soup, article_title, img_cnt)
+			self.download_images_class_aligncenter(soup, article_title, img_cnt)
 				
 	def download_images_class_wpblockimage(self, soup, article_title, img_cnt):
 		for img_idx in range(len(soup.select(".wp-block-image img"))):
@@ -217,9 +217,9 @@ def main():
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
 
-		# url = "https://am-our.com/love/92162/" # テスト
-		# Writer.download_images(url, 99)
-		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
+		url_dict_test = [{'article_url': 'https://am-our.com/love/91864/', 'article_date': '2020.01.01'}] # テスト
+		for series_num, url_dict in enumerate(url_dict_test, start=1):
+		# for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
 			Writer.download_images(url, series_num)
 
