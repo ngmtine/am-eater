@@ -122,39 +122,15 @@ class AmEater:
 			# パターン１
 			# 例：https://am-our.com/love/110/17022/
 			if soup.select(".photo img"):
-				for idx in range(len(soup.select(".photo img"))):
-					img_url = soup.select(".photo img")[idx].get("src")
-					filename = f"{article_title}_{idx+1}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-					image = requests.get(img_url).content
-					try:
-						with open(filename, mode="wb") as file:
-							file.write(image)
-					except Exception as e:
-						print(e)
-						return
+				self.download_images_class_photo(soup, article_title)
 				self.append_downloaded_txt(page_url) # ダウンロード成功したらdownloaded.txtにurlを追記
+
 
 			# パターン２
 			# 1ページに1画像のみを想定
 			# 例：https://am-our.com/love/103245/
 			elif soup.select(".aligncenter.is-resized"):
-				idx = 0
-				while True:
-					idx += 1
-					url_idx = f"{page_url}{idx}/"
-					response = requests.get(url_idx)
-					if response.status_code == 404:
-						break
-					soup = BeautifulSoup(response.text,'lxml')
-					img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
-					filename = f"{article_title}_{idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-					image = requests.get(img_url).content
-					try:
-						with open(filename, mode="wb") as file:
-							file.write(image)
-					except Exception as e:
-						print(e)
-						return
+				self.download_images_class_aligncenter(soup, article_title)
 				self.append_downloaded_txt(page_url) # ダウンロード成功したらdownloaded.txtにurlを追記
 				
 			else: # ダウンロード用のコードが用意されていないパターンの場合
@@ -167,6 +143,39 @@ class AmEater:
 		with open("downloaded.txt", mode="a") as f:
 			f.writelines(f"{string}\n")
 
+	def download_images_class_photo(self, soup, article_title):
+		for idx in range(len(soup.select(".photo img"))):
+			img_url = soup.select(".photo img")[idx].get("src")
+			filename = f"{article_title}_{idx+1}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+			image = requests.get(img_url).content
+			try:
+				with open(filename, mode="wb") as file:
+					file.write(image)
+			except Exception as e:
+				print(e)
+				return
+		# if 続きのページがあるなら次のページに遷移して処理する
+	
+	def download_images_class_aligncenter(soup, article_title):
+		idx = 0
+		while True:
+			idx += 1
+			url_with_idx = f"{page_url}{idx}/"
+			response = requests.get(url_with_idx)
+			if response.status_code == 404:
+				break
+			soup = BeautifulSoup(response.text,'lxml')
+			img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
+			filename = f"{article_title}_{idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+			image = requests.get(img_url).content
+			try:
+				with open(filename, mode="wb") as file:
+					file.write(image)
+			except Exception as e:
+				print(e)
+				return
+
+				
 def main():
 	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
