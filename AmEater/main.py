@@ -120,17 +120,22 @@ class AmEater:
 			article_title = f"{str(series_num)}_{article_title}"
 			print(f"★ {article_title} をダウンロードします")
 
-			# パターン１
-			# 例：https://am-our.com/love/110/17022/
+			# パターン１ 例：https://am-our.com/love/110/17022/
 			if soup.select(".photo img"):
 				img_cnt = 1
 				self.download_images_class_photo(soup, article_title, img_cnt)
 				self.append_downloaded_txt(page_url)
 
-			# パターン２
-			# 例：https://am-our.com/love/103245/
+			# パターン２ 例：https://am-our.com/love/103245/
 			elif soup.select(".aligncenter"):
-				self.download_images_class_aligncenter(soup, article_title)
+				img_cnt = 1
+				self.download_images_class_aligncenter(soup, article_title, img_cnt)
+				self.append_downloaded_txt(page_url)
+				
+			# パターン３ 例：https://am-our.com/love/103245/
+			elif soup.select(".wp-block-image"):
+				img_cnt = 1
+				self.download_images_class_wpblockimage(soup, article_title, img_cnt)
 				self.append_downloaded_txt(page_url)
 				
 			else: # ダウンロード用のコードが用意されていないパターンの場合
@@ -163,17 +168,10 @@ class AmEater:
 			soup = BeautifulSoup(response.text,'lxml')
 			self.download_images_class_photo(soup, article_title, img_cnt)
 	
-	def download_images_class_aligncenter(self, soup, article_title):
-		page_idx = 0
-		while True:
-			page_idx += 1
-			url_with_idx = f"{page_url}{page_idx}/"
-			response = requests.get(url_with_idx)
-			if response.status_code == 404:
-				break
-			soup = BeautifulSoup(response.text,'lxml')
-			img_url = soup.select(".aligncenter.is-resized")[0].select("img")[0].get("src")
-			filename = f"{article_title}_{page_idx}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+	def download_images_class_aligncenter(self, soup, article_title, img_cnt):
+		for img_idx in range(len(soup.select(".aligncenter img"))):
+			img_url = soup.select(".aligncenter img")[img_idx].get("src")
+			filename = f"{article_title}_{img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
 			image = requests.get(img_url).content
 			try:
 				with open(filename, mode="wb") as file:
@@ -181,7 +179,34 @@ class AmEater:
 			except Exception as e:
 				print(e)
 				return
+			img_cnt += 1
 
+		# 次のページがあるなら遷移して処理する
+		if soup.select(".next_page"):
+			nextpage_url = soup.select(".next_page_block")[0].get("href")
+			response = requests.get(nextpage_url)
+			soup = BeautifulSoup(response.text,'lxml')
+			self.download_images_class_photo(soup, article_title, img_cnt)
+				
+	def download_images_class_wpblockimage(self, soup, article_title, img_cnt):
+		for img_idx in range(len(soup.select(".wp-block-image img"))):
+			img_url = soup.select(".wp-block-image img")[img_idx].get("src")
+			filename = f"{article_title}_{img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+			image = requests.get(img_url).content
+			try:
+				with open(filename, mode="wb") as file:
+					file.write(image)
+			except Exception as e:
+				print(e)
+				return
+			img_cnt += 1
+
+		# 次のページがあるなら遷移して処理する
+		if soup.select(".next_page"):
+			nextpage_url = soup.select(".next_page_block")[0].get("href")
+			response = requests.get(nextpage_url)
+			soup = BeautifulSoup(response.text,'lxml')
+			self.download_images_class_photo(soup, article_title, img_cnt)
 				
 def main():
 	print("★ starting am-eater...")
