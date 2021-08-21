@@ -109,89 +109,49 @@ class AmEater:
 			連載の中の第何話目かを示す変数
 		"""
 
-		response = requests.get(page_url)
-		soup = BeautifulSoup(response.text,'lxml')
-
 		if page_url in self.downloaded_list: # ダウンロード済みの場合
 			return
 
 		else: # 未ダウンロードの場合
-			article_title = soup.select(".heading.heading-primary")[0].getText()
-			article_title = f"{str(series_num)}_{article_title}"
-			print(f"★ {article_title} をダウンロードします")
-
-			# パターン１ 例：https://am-our.com/love/110/17022/
-			if soup.select(".photo img"):
-				img_cnt = 1
-				self.download_images_class_photo(soup, article_title, img_cnt)
-				self.append_downloaded_txt(page_url)
-
-			# パターン２ 例：https://am-our.com/love/103245/
-			elif soup.select(".aligncenter"):
-				img_cnt = 1
-				self.download_images_class_aligncenter(soup, article_title, img_cnt)
-				self.append_downloaded_txt(page_url)
-				
-			# パターン３ 例：https://am-our.com/love/103245/
-			elif soup.select(".wp-block-image"):
-				img_cnt = 1
-				self.download_images_class_wpblockimage(soup, article_title, img_cnt)
-				self.append_downloaded_txt(page_url)
-				
-			else: # ダウンロード用のコードが用意されていないパターンの場合
-				print("★ 未定義urlです")
-				print(f"★ {series_num} {article_title} をダウンロードできませんでした")
-
+			Download = Downloader(page_url, series_num)
+			Download.download_starter()
+			self.append_downloaded_txt(page_url)
 		return
 
 	def append_downloaded_txt(self, string):
 		with open("downloaded.txt", mode="a") as f:
 			f.writelines(f"{string}\n")
 
-	def download_images_class_photo(self, soup, article_title, img_cnt):
-		for img_idx in range(len(soup.select(".photo img"))):
-			img_url = soup.select(".photo img")[img_idx].get("src")
-			filename = f"{article_title}_{img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-			image = requests.get(img_url).content
-			try:
-				with open(filename, mode="wb") as file:
-					file.write(image)
-			except Exception as e:
-				print(e)
-				return
-			img_cnt += 1
+class Downloader:
+	def __init__(self, page_url, series_num):
+		self.cssselector_list = [".photo", ".aligncenter", ".wp-block-image"]
+		self.page_url = page_url
+		self.series_num = series_num
+		self.article_title = self.get_article_title()
+		self.img_cnt = 1
+		print(f"★ {self.article_title} をダウンロードします")
 
-		# 次のページがあるなら遷移して処理する
-		if soup.select(".next_page"):
-			nextpage_url = soup.select(".next_page_block")[0].get("href")
-			response = requests.get(nextpage_url)
-			soup = BeautifulSoup(response.text,'lxml')
-			self.download_images_class_photo(soup, article_title, img_cnt)
-	
-	def download_images_class_aligncenter(self, soup, article_title, img_cnt):
-		for img_idx in range(len(soup.select(".aligncenter img"))):
-			img_url = soup.select(".aligncenter img")[img_idx].get("src")
-			filename = f"{article_title}_{img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
-			image = requests.get(img_url).content
-			try:
-				with open(filename, mode="wb") as file:
-					file.write(image)
-			except Exception as e:
-				print(e)
-				return
-			img_cnt += 1
+	def get_article_title(self):
+		"""記事タイトルの取得"""
+		response = requests.get(self.page_url)
+		soup = BeautifulSoup(response.text,'lxml')
+		article_title = soup.select(".heading.heading-primary")[0].getText()
+		article_title = f"{str(self.series_num)}_{article_title}"
+		return article_title
 
-		# 次のページがあるなら遷移して処理する
-		if soup.select(".next_page"):
-			nextpage_url = soup.select(".next_page_block")[0].get("href")
-			response = requests.get(nextpage_url)
-			soup = BeautifulSoup(response.text,'lxml')
-			self.download_images_class_aligncenter(soup, article_title, img_cnt)
+	def download_starter(self):
+		response = requests.get(self.page_url)
+		soup = BeautifulSoup(response.text,'lxml')
+
+		for cssselector in self.cssselector_list:
+			if soup.select(cssselector):
+				self.download_with_cssselector(soup, cssselector)
 				
-	def download_images_class_wpblockimage(self, soup, article_title, img_cnt):
-		for img_idx in range(len(soup.select(".wp-block-image img"))):
-			img_url = soup.select(".wp-block-image img")[img_idx].get("src")
-			filename = f"{article_title}_{img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
+	def download_with_cssselector(self, soup, cssselector):
+		# ページ内の画像をDL
+		for img_idx in range(len(soup.select(f"{cssselector} img"))):
+			img_url = soup.select(f"{cssselector} img")[img_idx].get("src")
+			filename = f"{self.article_title}_{self.img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
 			image = requests.get(img_url).content
 			try:
 				with open(filename, mode="wb") as file:
@@ -199,15 +159,13 @@ class AmEater:
 			except Exception as e:
 				print(e)
 				return
-			img_cnt += 1
+			self.img_cnt += 1
 
-		# 次のページがあるなら遷移して処理する
+		# 次のページがあるなら遷移
 		if soup.select(".next_page"):
-			nextpage_url = soup.select(".next_page_block")[0].get("href")
-			response = requests.get(nextpage_url)
-			soup = BeautifulSoup(response.text,'lxml')
-			self.download_images_class_wpblockimage(soup, article_title, img_cnt)
-				
+			self.page_url = soup.select(".next_page_block")[0].get("href")
+			self.download_starter()
+
 def main():
 	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -217,13 +175,11 @@ def main():
 	for writer_id in writers:
 		Writer = AmEater(writer_id)
 
-		url_dict_test = [{'article_url': 'https://am-our.com/love/91864/', 'article_date': '2020.01.01'}] # テスト
-		for series_num, url_dict in enumerate(url_dict_test, start=1):
-		# for series_num, url_dict in enumerate(Writer.article_urls, start=1):
+		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
 			Writer.download_images(url, series_num)
 
-		print("オワリ")
+		print("★ オワリ")
 
 if __name__ == "__main__":
 	main()
