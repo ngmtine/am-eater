@@ -43,7 +43,7 @@ class AmEater:
 
 	def mkdir_chdir(self):
 		"""
-		カレントディレクトリ（ダウンロードルートフォルダ）にダウンロード先フォルダの作成と移動
+		カレントディレクトリにダウンロード先フォルダの作成と移動
 		"""
 		dest_dir = os.path.join(os.getcwd(), self.writer_name)
 		os.makedirs(dest_dir, exist_ok=True)
@@ -52,7 +52,6 @@ class AmEater:
 	def get_downloaded_list(self):
 		"""
 		カレントディレクトリのdownloaded.txtの作成と読み込み
-		（ダウンロード先フォルダにCDしていることが前提）
 		"""
 		downloaded_txt = os.path.join(os.getcwd(), "downloaded.txt")
 
@@ -146,6 +145,7 @@ class Downloader:
 		for cssselector in self.cssselector_list:
 			if soup.select(cssselector):
 				self.download_with_cssselector(soup, cssselector)
+				break
 				
 	def download_with_cssselector(self, soup, cssselector):
 		# ページ内の画像をDL
