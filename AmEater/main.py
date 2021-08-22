@@ -10,11 +10,16 @@ def read_settings():
 	try:
 		ini = configparser.ConfigParser()
 		ini.read("settings.ini", encoding="utf-8_sig")
-		writers_ = ini["writers"]["idlist"]
+		_author = ini["author"]["idlist"]
+		_series = ini["series"]["idlist"]
+		# writers_ = ini["writers"]["idlist"]
 		writers = []
-		for i in writers_.split(","):
+		for i in _author.split(","):
 			if i:
-				writers.append(i)
+				writers.append(f"author/{i.strip()}")
+		for i in _series.split(","):
+			if i:
+				writers.append(f"series/{i.strip()}")
 	except Exception as e:
 		print(f"{e}\nsettings.ini読み込みエラーだよ～ちゃんと用意してね～")
 		exit()
@@ -35,7 +40,7 @@ class AmEater:
 		"""
 		ライター名を取得する
 		"""
-		url = f"https://am-our.com/author/{self.writer_id}/"
+		url = f"https://am-our.com/{self.writer_id}/"
 		response = requests.get(url)
 		soup = BeautifulSoup(response.text,'lxml')
 		writername = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
@@ -74,18 +79,18 @@ class AmEater:
 		page_num = 0
 		while True:
 			page_num += 1
-			request_url = f"https://am-our.com/author/{self.writer_id}/page/{page_num}/"
+			request_url = f"https://am-our.com/{self.writer_id}/page/{page_num}/"
 			response = requests.get(request_url)
 			if response.status_code == 404: # ページ遷移先がなくなった時
 				break
 
 			soup = BeautifulSoup(response.text,'lxml')
-			pages = soup.select(".archive_author_top.view-mask, .article_top_center.archive__item.view-mask")
+			pages = soup.select(".archive_author_top.view-mask, .article_top_center.archive__item.view-mask, .opening-archive-item-custom.view-mask, .archive-item-custom.view-mask")
 
 			while pages:
 				try:
 					article = pages.pop()
-					article_url = article.select(".eyecatch__link.eyecatch__link-mask-latest")[0].attrs["href"]
+					article_url = article.select(".eyecatch__link.eyecatch__link-mask-latest, .eyecatch__link.eyecatch__link-mask")[0].attrs["href"]
 					article_date = article.select(".dateList__item")[0].contents[0].strip()
 					article_infos.append({"article_url": article_url, "article_date": article_date})
 				except Exception as e:
@@ -173,13 +178,16 @@ def main():
 
 	writers = read_settings()
 	for writer_id in writers:
+		os.chdir(root_dir)
 		Writer = AmEater(writer_id)
 
 		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
 			Writer.download_images(url, series_num)
 
-		print("★ オワリ")
+		print(f"★ {Writer.writer_name}のダウンロード完了しました")
+		
+	print("★ オワリ")
 
 if __name__ == "__main__":
 	main()
