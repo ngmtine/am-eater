@@ -32,7 +32,7 @@ class AmEater:
 		self.series_id: str
 			https://am-our.com/ 以降の、シリーズ記事一覧を含むページurl
 		self.series_name: str
-			シリーズ名
+			シリーズ名、又は著者名
 		self.downloaded_list: list
 			そのシリーズのダウンロード済みurlリスト
 		self.article_urls: list
