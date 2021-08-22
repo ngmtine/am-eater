@@ -10,47 +10,49 @@ def read_settings():
 	try:
 		ini = configparser.ConfigParser()
 		ini.read("settings.ini", encoding="utf-8_sig")
-		_author = ini["author"]["idlist"]
 		_series = ini["series"]["idlist"]
-		# writers_ = ini["writers"]["idlist"]
-		writers = []
-		for i in _author.split(","):
-			if i:
-				writers.append(f"author/{i.strip()}")
+		series = []
 		for i in _series.split(","):
 			if i:
-				writers.append(f"series/{i.strip()}")
+				series.append(f"{i.strip()}")
+
 	except Exception as e:
 		print(f"{e}\nsettings.ini読み込みエラーだよ～ちゃんと用意してね～")
 		exit()
 	
-	return writers
+	return series
 
 class AmEater:
-	"""ライター固有のID（writer_id）を受け取り、記事内の画像をDLします"""
-	
-	def __init__(self, writer_id):
-		self.writer_id = writer_id
-		self.writer_name = self.get_writername()
+	"""
+	series_idを受け取り、記事内の画像をDLします
+
+	Parameters
+	---
+	series_id: str
+		https://am-our.com/ 以降の、シリーズ記事一覧を含むページurl
+	"""
+	def __init__(self, series_id):
+		self.series_id = series_id
+		self.series_name = self.get_writername()
 		self.mkdir_chdir()
 		self.downloaded_list = self.get_downloaded_list()
 		self.article_urls = self.get_article_urls()
 
 	def get_writername(self):
 		"""
-		ライター名を取得する
+		シリーズ名（著者名）を取得する
 		"""
-		url = f"https://am-our.com/{self.writer_id}/"
+		url = f"https://am-our.com/{self.series_id}/"
 		response = requests.get(url)
 		soup = BeautifulSoup(response.text,'lxml')
-		writername = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
-		return writername
+		seriesname = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
+		return seriesname
 
 	def mkdir_chdir(self):
 		"""
 		カレントディレクトリにダウンロード先フォルダの作成と移動
 		"""
-		dest_dir = os.path.join(os.getcwd(), self.writer_name)
+		dest_dir = os.path.join(os.getcwd(), self.series_name)
 		os.makedirs(dest_dir, exist_ok=True)
 		os.chdir(dest_dir)
 
@@ -73,13 +75,13 @@ class AmEater:
 
 	def get_article_urls(self):
 		"""
-		writer_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す
+		series_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す
 		"""
 		article_infos = []
 		page_num = 0
 		while True:
 			page_num += 1
-			request_url = f"https://am-our.com/{self.writer_id}/page/{page_num}/"
+			request_url = f"https://am-our.com/{self.series_id}/page/{page_num}/"
 			response = requests.get(request_url)
 			if response.status_code == 404: # ページ遷移先がなくなった時
 				break
@@ -127,6 +129,16 @@ class AmEater:
 			f.writelines(f"{string}\n")
 
 class Downloader:
+	"""
+	page_urlとseries_numを受け取り、ダウンロードする
+
+	Parameters
+	---
+	page_url: str
+		個別記事のurl
+	series_num: int
+		シリーズ内の第何話かを示す数字
+	"""
 	def __init__(self, page_url, series_num):
 		self.cssselector_list = [".photo", ".aligncenter", ".wp-block-image"]
 		self.page_url = page_url
@@ -144,6 +156,7 @@ class Downloader:
 		return article_title
 
 	def download_starter(self):
+		"""記事によって画像urlを含むcssセレクタが異なるのでそれのあれ"""
 		response = requests.get(self.page_url)
 		soup = BeautifulSoup(response.text,'lxml')
 
@@ -153,7 +166,7 @@ class Downloader:
 				break
 				
 	def download_with_cssselector(self, soup, cssselector):
-		# ページ内の画像をDL
+		"""ページ内の画像をDL"""
 		for img_idx in range(len(soup.select(f"{cssselector} img"))):
 			img_url = soup.select(f"{cssselector} img")[img_idx].get("src")
 			filename = f"{self.article_title}_{self.img_cnt}.png" # png以外の拡張子が存在する場合は書き方変える必要あり
@@ -172,23 +185,21 @@ class Downloader:
 			self.download_starter()
 
 def main():
-	print("★ starting am-eater...")
 	root_dir = os.path.dirname(os.path.abspath(__file__))
 	os.chdir(root_dir)
 
 	writers = read_settings()
-	for writer_id in writers:
+	for series_id in writers:
 		os.chdir(root_dir)
-		Writer = AmEater(writer_id)
+		Writer = AmEater(series_id)
 
+		print(f"★ --- {Writer.series_name} のダウンロード開始します ---")
 		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
 			url = url_dict["article_url"]
 			Writer.download_images(url, series_num)
-
-		print(f"★ {Writer.writer_name}のダウンロード完了しました")
-		
-	print("★ オワリ")
+		print(f"★ --- {Writer.series_name} のダウンロード完了しました ---")
 
 if __name__ == "__main__":
+	print("★ starting am-eater...")
 	main()
-
+	print("★ オワリ")
