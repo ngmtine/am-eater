@@ -4,9 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 
 def read_settings():
-	"""
-	settings.iniを読み込みます
-	"""
+	"""settings.iniを読み込みます"""
 	try:
 		ini = configparser.ConfigParser()
 		ini.read("settings.ini", encoding="utf-8_sig")
@@ -38,28 +36,30 @@ class AmEater:
 		self.downloaded_list = self.get_downloaded_list()
 		self.article_urls = self.get_article_urls()
 
+	def check_exist(self, response):
+		"""指定したシリーズの存在チェック
+		series_nameを取得するときに一度アクセスするので直接responseオブジェクトを受け取ることにする"""
+		if response.status_code == 404: # 存在しないシリーズ名を指定した場合
+			print(f"★ {self.series_id} は存在しないシリーズです")
+			return
+
 	def get_writername(self):
-		"""
-		シリーズ名（著者名）を取得する
-		"""
+		"""シリーズ名（著者名）を取得する"""
 		url = f"https://am-our.com/{self.series_id}/"
 		response = requests.get(url)
+		self.check_exist(response)
 		soup = BeautifulSoup(response.text,'lxml')
 		seriesname = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
 		return seriesname
 
 	def mkdir_chdir(self):
-		"""
-		カレントディレクトリにダウンロード先フォルダの作成と移動
-		"""
+		"""カレントディレクトリにダウンロード先フォルダの作成と移動"""
 		dest_dir = os.path.join(os.getcwd(), self.series_name)
 		os.makedirs(dest_dir, exist_ok=True)
 		os.chdir(dest_dir)
 
 	def get_downloaded_list(self):
-		"""
-		カレントディレクトリのdownloaded.txtの作成と読み込み
-		"""
+		"""カレントディレクトリのdownloaded.txtの作成と読み込み"""
 		downloaded_txt = os.path.join(os.getcwd(), "downloaded.txt")
 
 		# downloaded.txtの作成
@@ -74,9 +74,7 @@ class AmEater:
 		return downloaded_list
 
 	def get_article_urls(self):
-		"""
-		series_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す
-		"""
+		"""series_idからダウンロード対象となる記事個別URLを取得し、ソート済みリストで返す"""
 		article_infos = []
 		page_num = 0
 		while True:
