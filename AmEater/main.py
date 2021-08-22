@@ -2,6 +2,7 @@ import os
 import configparser
 import requests
 from bs4 import BeautifulSoup
+from requests.sessions import SessionRedirectMixin
 
 def read_settings():
 	"""settings.iniを読み込みます"""
@@ -24,30 +25,36 @@ class AmEater:
 	"""
 	series_idを受け取り、記事内の画像をDLします
 
-	Parameters
-	---
-	series_id: str
-		https://am-our.com/ 以降の、シリーズ記事一覧を含むページurl
+	Parameters:
+		series_id: str
+			https://am-our.com/ 以降の、シリーズ記事一覧を含むページurl
+
+	Instance Variables:
+		self.series_id: str
+			https://am-our.com/ 以降の、シリーズ記事一覧を含むページurl
+		self.series_name: str
+			シリーズ名
+		self.downloaded_list: list
+			そのシリーズのダウンロード済みurlリスト
+		self.article_urls: list
+			そのシリーズの全記事urlリスト
 	"""
+
 	def __init__(self, series_id):
 		self.series_id = series_id
-		self.series_name = self.get_writername()
-		self.mkdir_chdir()
-		self.downloaded_list = self.get_downloaded_list()
-		self.article_urls = self.get_article_urls()
 
 	def check_exist(self, response):
 		"""指定したシリーズの存在チェック
-		series_nameを取得するときに一度アクセスするので直接responseオブジェクトを受け取ることにする"""
-		if response.status_code == 404: # 存在しないシリーズ名を指定した場合
+		get_writername()でseries_nameを取得するとき一度アクセスするので、その関数内から直接responseオブジェクトを受け取ることにする"""
+		if response.status_code == 404:
 			print(f"★ {self.series_id} は存在しないシリーズです")
-			return
+			raise SeriesNotExists("存在しないシリーズです")
 
 	def get_writername(self):
 		"""シリーズ名（著者名）を取得する"""
 		url = f"https://am-our.com/{self.series_id}/"
 		response = requests.get(url)
-		self.check_exist(response)
+		self.check_exist(response) # シリーズ名の存在チェック
 		soup = BeautifulSoup(response.text,'lxml')
 		seriesname = soup.select(".breadcrumb__item.breadcrumb__item-current")[0].getText()
 		return seriesname
@@ -103,14 +110,13 @@ class AmEater:
 	def download_images(self, page_url, series_num):
 		"""
 		個別ページのurlから画像をダウンロードする
-		但し記事によってはhtmlが異なることに注意
+		但し記事によってはcssセレクタが異なることに注意
 
-		Parameters
-		---
-		page_url: str
-			ダウンロードしたい画像へのリンクを含む、個別記事のurl
-		series_num: int
-			連載の中の第何話目かを示す変数
+		Parameters:
+			page_url: str
+				ダウンロードしたい画像へのリンクを含む、個別記事のurl
+			series_num: int
+				連載の中の第何話目かを示す変数
 		"""
 
 		if page_url in self.downloaded_list: # ダウンロード済みの場合
@@ -130,13 +136,25 @@ class Downloader:
 	"""
 	page_urlとseries_numを受け取り、ダウンロードする
 
-	Parameters
-	---
-	page_url: str
-		個別記事のurl
-	series_num: int
-		シリーズ内の第何話かを示す数字
+	Parameters:
+		page_url: str
+			個別記事のurl
+		series_num: int
+			シリーズ内の第何話かを示す数字
+
+	Instance Variables:
+		self.cssselector_list: list
+			画像urlを指定するためのcssセレクタのリスト
+		self.page_url: str
+			個別記事のurl
+		self.series_num: int
+			シリーズの第何話かを示す数字
+		self.article_title: str
+			記事タイトル
+		self.img_cnt: str
+			個別記事内の何枚目の画像かを示す数字
 	"""
+
 	def __init__(self, page_url, series_num):
 		self.cssselector_list = [".photo", ".aligncenter", ".wp-block-image"]
 		self.page_url = page_url
@@ -189,13 +207,24 @@ def main():
 	writers = read_settings()
 	for series_id in writers:
 		os.chdir(root_dir)
-		Writer = AmEater(series_id)
+		Series = AmEater(series_id)
+		try:
+			Series.series_name = Series.get_writername()
+		except SeriesNotExists:
+			continue
+		Series.mkdir_chdir()
+		Series.downloaded_list = Series.get_downloaded_list()
+		Series.article_urls = Series.get_article_urls()
 
-		print(f"★ --- {Writer.series_name} のダウンロード開始します ---")
-		for series_num, url_dict in enumerate(Writer.article_urls, start=1):
+		print(f"★ --- {Series.series_name} のダウンロード開始します ---")
+		for series_num, url_dict in enumerate(Series.article_urls, start=1):
 			url = url_dict["article_url"]
-			Writer.download_images(url, series_num)
-		print(f"★ --- {Writer.series_name} のダウンロード完了しました ---")
+			Series.download_images(url, series_num)
+		print(f"★ --- {Series.series_name} のダウンロード完了しました ---")
+
+class SeriesNotExists(Exception):
+	"""series_idが存在しない場合（404にアクセスする場合）を知らせる例外クラス"""
+	pass
 
 if __name__ == "__main__":
 	print("★ starting am-eater...")
