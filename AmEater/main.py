@@ -2,7 +2,6 @@ import os
 import configparser
 import requests
 from bs4 import BeautifulSoup
-from requests.sessions import SessionRedirectMixin
 
 def read_settings():
 	"""settings.iniを読み込みます"""
